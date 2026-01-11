@@ -1,31 +1,76 @@
-import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import linregress
-import numpy as np
+import pandas as pd
+import seaborn as sns
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+df = pd.read_csv("fcc-forum-pageviews.csv")
+df["date"] = pd.to_datetime(df["date"])
+df = df.set_index('date')
 
-def draw_plot():
-    df = pd.read_csv('epa-sea-level.csv')
+df = df.loc[(df['value'] >= df['value'].quantile(0.025)) & (df['value'] <= df['value'].quantile(0.975))]
 
-    plt.scatter(df['Year'], df['CSIRO Adjusted Sea Level'])
 
-    lineA = linregress(df['Year'], df['CSIRO Adjusted Sea Level'])
-    xA = np.arange(df['Year'].min(),2050,1)
-    yA = xA*lineA.slope + lineA.intercept
+def draw_line_plot():
 
-    plt.plot(xA,yA)
+    fig, ax = plt.subplots(figsize=(32, 10), dpi=100)
+    ax.set_title("Daily freeCodeCamp Forum Page Views 5/2016-12/2019")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Page Views")
+    sns.lineplot(data=df, legend=False)
 
-    df_2000 = df[df['Year'] >= 2000]
+    
+    fig.savefig('line_plot.png')
+    return fig
 
-    lineB = linregress(df_2000['Year'], df_2000['CSIRO Adjusted Sea Level'])
-    xB = np.arange(2000,2050,1)
-    yB = xB*lineB.slope + lineB.intercept
+def draw_bar_plot():
+   
+    df_bar = df.copy()
+    df_bar["Years"] = df_bar.index.year
+    df_bar["Months"] = df_bar.index.month_name()
+    df_bar = pd.DataFrame(df_bar.groupby(["Years", "Months"], sort=False)["value"].mean().round().astype(int))
+    df_bar = df_bar.rename(columns={"value": "Average Page Views"})
+    df_bar = df_bar.reset_index()
+    missing_data = {
+        "Years": [2016, 2016, 2016, 2016],
+        "Months": ['January', 'February', 'March', 'April'],
+        "Average Page Views": [0, 0, 0, 0]
+    }
 
-    plt.plot(xB,yB)
+    df_bar = pd.concat([pd.DataFrame(missing_data), df_bar])
 
-    plt.xlabel('Year')
-    plt.ylabel('Sea Level (inches)')
-    plt.title('Rise in Sea Level')
+    
+    fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
+    ax.set_title("Daily freeCodeCamp Forum Average Page Views per Month")
+
+    chart = sns.barplot(data=df_bar, x="Years", y="Average Page Views", hue="Months", palette="tab10")
+    chart.set_xticklabels(chart.get_xticklabels(), rotation=90, horizontalalignment='center')
+
+   
+    fig.savefig('bar_plot.png')
+    return fig
+
+def draw_box_plot():
+    # Prepare data for box plots (this part is done!)
+    df_box = df.copy()
+    df_box.reset_index(inplace=True)
+    df_box['year'] = [d.year for d in df_box.date]
+    df_box['month'] = [d.strftime('%b') for d in df_box.date]
+
+    fig, axes = plt.subplots(1, 2, figsize=(32, 10), dpi=100)
     
 
-    plt.savefig('sea_level_plot.png')
-    return plt.gca()
+    sns.boxplot(data=df_box, x="year", y="value", ax=axes[0])
+    axes[0].set_title("Year-wise Box Plot (Trend)")
+    axes[0].set_xlabel("Year")
+    axes[0].set_ylabel("Page Views")
+    
+  
+    month_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    sns.boxplot(data=df_box, x="month", y="value", order=month_order, ax=axes[1])
+    axes[1].set_title("Month-wise Box Plot (Seasonality)")
+    axes[1].set_xlabel("Month")
+    axes[1].set_ylabel("Page Views")
+
+    
+    fig.savefig('box_plot.png')
+    return fig
